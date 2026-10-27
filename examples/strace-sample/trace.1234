@@ -1,0 +1,13 @@
+[pid 1234] execve("/system/xbin/su", ["su"], NULL) = 0
+[pid 1234] mount("/dev/block/sda1", "/mnt/foo", "ext4", 0, NULL) = 0
+[pid 1234] setuid(0) = 0
+[pid 1234] ptrace(PTRACE_ATTACH, 1234, NULL, NULL) = 0
+[pid 1234] socket(AF_PACKET, SOCK_RAW, 0x88a8) = 3
+[pid 1234] bind(3, {sa_family=AF_INET, sin_port=htons(80)}, 16) = 0
+[pid 1234] openat(AT_FDCWD, "/dev/mem", O_RDWR) = -1 EACCES (Permission denied)
+[pid 1234] bpf(BPF_MAP_CREATE, {bpf_attr={...}}, 64) = 4
+[pid 1234] setsockopt(5, SOL_SOCKET, SO_MARK, [0xff], 4) = 0
+[pid 1234] setxattr("/data/foo", "security.capability", {len=20}, 0) = 0
+[pid 1234] clone(CLONE_NEWNS|CLONE_NEWPID, ...) = 5678
+[pid 1234] write(3, "", 4096) = 0
+[pid 1234] close(4) = 0

@@ -1,0 +1,35 @@
+{
+  "_meta": {
+    "target_fork": "kernelsu",
+    "schema_version": "2026-10-28",
+    "generated_by": "ksu-profile-analyzer skill",
+    "mode": "minimal",
+    "notes": "Minimal-mode profile. Only capabilities/groups with unambiguous static evidence. Ambiguous signals excluded until user confirms in Pass 2."
+  },
+  "profile": {
+    "name": "PLACEHOLDER_PACKAGE_NAME",
+    "currentUid": 0,
+    "allowSu": false,
+    "rootUseDefault": false,
+    "rootTemplate": null,
+    "uid": 0,
+    "gid": 0,
+    "groups": [],
+    "capabilities": [],
+    "context": "u:r:ksu:s0",
+    "namespace": 0,
+    "nonRootUseDefault": false,
+    "umountModules": true,
+    "rules": "",
+    "flags": 1
+  },
+  "fork_extensions": {
+    "kernelsu": null,
+    "ksu-next": {
+      "_note": "Profile schema is identical to upstream. Manager adds app-profile backup/restore."
+    },
+    "sukisu-ultra": {
+      "_note": "Profile schema is identical to upstream. Manager adds SUSFS toggles (mount hide, AVC spoof) at the manager level."
+    }
+  }
+}

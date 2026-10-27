@@ -1,0 +1,159 @@
+{# Jinja2 template for analysis.md
+   Variables expected:
+     - package_name: str
+     - target_path: str
+     - target_type: str (apk|elf|repo|strace)
+     - mode: str (minimal|recommended)
+     - generated_at: str (ISO timestamp)
+     - fork_detection_hint: str (the pre-baked section)
+     - signals_summary: list of {kind, name, source, confidence, evidence}
+     - capabilities: list of {name, source_signals: list, source_kind: str}
+     - groups: list of {gid, name, source_signals: list}
+     - selinux_context: str (default "u:r:ksu:s0")
+     - selinux_rules: str (default "")
+     - selinux_custom_opt_in: bool
+     - allow_su: bool
+     - umount_modules: bool
+     - namespace: str (INHERITED|GLOBAL|INDIVIDUAL)
+     - ambiguous_findings: list of {id, signal, implied_cap, severity, question} (numbered 1..N)
+     - strace_helper_needed: bool
+     - strace_helper_section: str (the pre-baked section if needed, else empty)
+     - current_uid_instruction: str (the pre-baked section)
+     - refresh_changelog: str (the pre-baked section, or "No refresh was needed.")
+#}
+# KSU App Profile Analysis — `{{ package_name }}`
+
+**Target**: `{{ target_path }}` ({{ target_type }})
+**Mode**: {{ mode }}
+**Generated**: {{ generated_at }}
+
+{{ fork_detection_hint }}
+
+---
+
+## TL;DR
+
+- **allowSu**: {{ allow_su }}
+- **umountModules**: {{ umount_modules }}
+- **SELinux context**: `{{ selinux_context }}`
+- **Namespace**: {{ namespace }}
+- **Capabilities ({{ capabilities | length }})**: {% for c in capabilities %}`{{ c.name }}`{% if not loop.last %}, {% endif %}{% endfor %}
+- **Groups ({{ groups | length }})**: {% for g in groups %}{{ g.gid }} ({{ g.name }}){% if not loop.last %}, {% endif %}{% endfor %}
+
+If any of these don't match what you expected, jump to **Ambiguous findings** below and answer the questions — the profile will be updated.
+
+---
+
+## Findings summary
+
+{% for s in signals_summary %}
+- **`{{ s.kind }}`** — `{{ s.name }}` ({{ s.confidence }})
+  - Source: `{{ s.source }}`
+  - Evidence: `{{ s.evidence }}`
+{% endfor %}
+
+(See `findings.json` in this directory for the full raw signal list.)
+
+---
+
+## Capabilities selected
+
+{% for c in capabilities %}
+### `{{ c.name }}`
+- **Why**: signals from {{ c.source_kind }}
+  {% for sig in c.source_signals %}  - `{{ sig.name }}` from `{{ sig.source }}` ({{ sig.confidence }})
+  {% endfor %}
+{% endfor %}
+
+---
+
+## Groups selected
+
+| GID | Name | Why |
+|---|---|---|
+{% for g in groups %}| `{{ g.gid }}` | `{{ g.name }}` | {% for sig in g.source_signals %}`{{ sig.name }}` from `{{ sig.source }}`; {% endfor %} |
+{% endfor %}
+
+---
+
+## SELinux policy
+
+- **Context**: `{{ selinux_context }}`
+- **Rules**:
+{% if selinux_rules %}
+```
+{{ selinux_rules }}
+```
+{% else %}(empty — uses kernel's inherited ksu domain)
+{% endif %}
+
+{% if not selinux_custom_opt_in %}
+**Note**: You are using the inherited `u:r:ksu:s0` context. If you want stricter SELinux isolation (a custom per-app domain), ask me to add one. I'll generate the rules and link `reference/troubleshoot_selinux.md` for debugging help.
+{% else %}
+**Custom domain active**: If the app misbehaves, see `reference/troubleshoot_selinux.md` (shipped with the skill) for step-by-step debugging.
+{% endif %}
+
+---
+
+## Non-root profile
+
+- `umountModules: {{ umount_modules }}` (whether to hide KSU-mounted modules from this app)
+- `nonRootUseDefault: false` (we customized it)
+
+For most apps, `umountModules: true` is correct — it hides KSU from the app. Set to `false` only if the app needs to see KSU modules (rare).
+
+---
+
+{{ current_uid_instruction }}
+
+---
+
+{% if strace_helper_needed %}
+{{ strace_helper_section }}
+{% endif %}
+
+---
+
+## ⚠️ Ambiguous findings — please confirm
+
+The following signals were detected but couldn't be unambiguously verified through static analysis. Each would imply an additional capability or group if confirmed. **They are currently NOT included in the profile.**
+
+Reply with answers like "yes to #2 and #5, no to #3" — I'll patch the profile JSON accordingly.
+
+{% for af in ambiguous_findings %}
+### #{{ af.id }}: {{ af.signal }}
+- **Implies**: `{{ af.implied_cap }}`
+- **Severity**: {{ af.severity }}
+- **Question**: {{ af.question }}
+
+{% endfor %}
+
+If you want to add capabilities not listed above (e.g. you know the app needs `CAP_SYS_NICE` for some reason), just tell me.
+
+---
+
+## How to apply
+
+1. Look up the real UID on device (see section above if present).
+2. Edit the `currentUid` field in:
+   - `profile.kernelsu.json`
+   - `profile.ksu-next.json`
+   - `profile.sukisu-ultra.json`
+   (All three are byte-identical apart from the `target_fork` field — pick whichever fork you're running.)
+3. Push the matching JSON to your device:
+   ```sh
+   adb push profile.<your_fork>.json /data/local/tmp/profile.json
+   ```
+4. Apply via the matching apply script (audit-only — read it first):
+   ```sh
+   bash apply.<your_fork>.sh
+   ```
+5. Verify:
+   ```sh
+   adb shell su -c 'id -Z'    # Should show u:r:ksu:s0 (or your custom domain)
+   adb shell su -c 'capsh --print'    # Should show the capabilities you granted
+   ```
+
+---
+
+{{ refresh_changelog }}

@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "target_fork": "kernelsu",
+    "schema_version": "2026-10-28",
+    "generated_by": "ksu-profile-analyzer skill",
+    "mode": "recommended",
+    "notes": "Recommended-mode profile. Minimal + the convenience set (CAP_DAC_READ_SEARCH, CAP_KILL, CAP_SYS_RESOURCE) added to every emitted root profile. User explicitly opted into this mode."
+  },
+  "profile": {
+    "name": "PLACEHOLDER_PACKAGE_NAME",
+    "currentUid": 0,
+    "allowSu": false,
+    "rootUseDefault": false,
+    "rootTemplate": null,
+    "uid": 0,
+    "gid": 0,
+    "groups": [],
+    "capabilities": [
+      "CAP_DAC_READ_SEARCH",
+      "CAP_KILL",
+      "CAP_SYS_RESOURCE"
+    ],
+    "context": "u:r:ksu:s0",
+    "namespace": 0,
+    "nonRootUseDefault": false,
+    "umountModules": true,
+    "rules": "",
+    "flags": 1
+  },
+  "fork_extensions": {
+    "kernelsu": null,
+    "ksu-next": {
+      "_note": "Profile schema is identical to upstream. Manager adds app-profile backup/restore."
+    },
+    "sukisu-ultra": {
+      "_note": "Profile schema is identical to upstream. Manager adds SUSFS toggles (mount hide, AVC spoof) at the manager level."
+    }
+  }
+}

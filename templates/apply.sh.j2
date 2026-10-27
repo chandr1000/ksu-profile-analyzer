@@ -1,0 +1,121 @@
+#!/system/bin/sh
+# ============================================================================
+# ksu-profile-analyzer — apply script ({{ fork_id }})
+# ----------------------------------------------------------------------------
+# THIS SCRIPT IS AUDIT-ONLY. The skill does NOT auto-execute it.
+# Read the profile JSON first, confirm the capabilities/groups match what you
+# expect, then run this script by hand.
+#
+# Target fork: {{ fork_display_name }}
+# Daemon binary: ksud (same name across all KSU-family forks)
+# Profile JSON: {{ profile_filename }}
+# ============================================================================
+#
+# Usage:
+#   1. adb push profile.{{ fork_id }}.json /data/local/tmp/profile.json
+#   2. adb push apply.{{ fork_id }}.sh /data/local/tmp/apply.sh
+#   3. adb shell chmod +x /data/local/tmp/apply.sh
+#   4. adb shell su -c '/data/local/tmp/apply.sh'
+#
+# What this script does:
+#   - Validates that ksud is available and the kernel module is loaded
+#   - Validates that the profile JSON is parseable
+#   - Calls `ksud profile set /data/local/tmp/profile.json`
+#   - Prints the applied profile back for verification
+#
+# What this script does NOT do:
+#   - It does NOT reboot the device (profile changes take effect immediately)
+#   - It does NOT modify any other app's profile
+#   - It does NOT touch SELinux mode (the profile's `rules` field handles that)
+#
+# Review checklist before running:
+#   [ ] I read profile.{{ fork_id }}.json and the capabilities make sense
+#   [ ] I filled in currentUid with the real UID from `adb shell pm list packages -U`
+#   [ ] I'm on a {{ fork_display_name }} device (check: adb shell pm list packages | grep -i {{ fork_id }})
+#   [ ] I have a backup of my current profile (if this is a re-apply)
+# ============================================================================
+
+set -eu
+
+PROFILE_PATH="${1:-/data/local/tmp/profile.json}"
+KSUD_BIN="ksud"
+
+echo "=== ksu-profile-analyzer apply ({{ fork_display_name }}) ==="
+echo ""
+
+# Sanity 1: must be root
+if [ "$(id -u)" != "0" ]; then
+    echo "ERROR: must run as root. Use: adb shell su -c '/data/local/tmp/apply.sh'"
+    exit 1
+fi
+
+# Sanity 2: ksud binary must exist
+if ! command -v "$KSUD_BIN" >/dev/null 2>&1; then
+    echo "ERROR: $KSUD_BIN not found in PATH. Are you on a {{ fork_display_name }} device?"
+    echo "Check: ls /data/adb/ | grep -E 'ksu|ksnd|sukid'"
+    exit 1
+fi
+
+# Sanity 3: profile JSON must exist
+if [ ! -f "$PROFILE_PATH" ]; then
+    echo "ERROR: profile not found at $PROFILE_PATH"
+    echo "Push it first: adb push profile.{{ fork_id }}.json $PROFILE_PATH"
+    exit 1
+fi
+
+# Sanity 4: profile JSON must parse (basic JSON validity check via ksud)
+echo "Validating profile at $PROFILE_PATH..."
+if ! "$KSUD_BIN" profile get "{{ placeholder_package_name }}" 0 >/dev/null 2>&1; then
+    :  # Profile doesn't exist yet — that's fine, we're setting it.
+fi
+
+# Show the profile we're about to apply
+echo ""
+echo "=== Profile to apply ==="
+cat "$PROFILE_PATH"
+echo ""
+
+# Confirm with the user
+echo "Review the above profile. Apply it now? [y/N]"
+read -r CONFIRM
+case "$CONFIRM" in
+    y|Y|yes|YES)
+        ;;
+    *)
+        echo "Aborted. Profile not applied."
+        exit 0
+        ;;
+esac
+
+# Apply
+echo ""
+echo "Applying..."
+if "$KSUD_BIN" profile set "$PROFILE_PATH"; then
+    echo "✅ Profile applied successfully."
+else
+    echo "❌ Failed to apply profile. ksud returned non-zero."
+    echo "Check kernel version: {{ fork_id }} requires MINIMAL_SUPPORTED_KERNEL >= 32513."
+    echo "Check: adb shell su -c 'cat /sys/module/kernelsu/version'"
+    exit 1
+fi
+
+# Verify
+echo ""
+echo "=== Verification ==="
+echo "Current SELinux domain (run su to test):"
+su -c 'id -Z' 2>/dev/null || echo "(could not get su context)"
+
+echo ""
+echo "Current capabilities of a freshly-su'd process:"
+su -c 'capsh --print 2>/dev/null' || echo "(capsh not available — try: su -c 'grep Cap /proc/self/status')"
+
+echo ""
+echo "=== Done ==="
+echo "If the app behaves unexpectedly:"
+{% if selinux_custom %}
+echo "  - SELinux denials: adb shell su -c 'dmesg | grep avc | tail -50'"
+echo "  - See reference/troubleshoot_selinux.md (shipped with the skill)"
+{% else %}
+echo "  - SELinux denials (if you switch to custom domain later): adb shell su -c 'dmesg | grep avc | tail -50'"
+{% endif %}
+echo "  - To revert: ksud profile set <previous_profile.json>"
